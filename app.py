@@ -97,15 +97,24 @@ if st.button("Generate Traffic Prediction"):
 
     # Run inference execution on the dynamically selected model
     # Run inference execution on the dynamically selected model
-    prediction = model.predict(input_scaled)[0]
+    prediction_raw = model.predict(input_scaled)[0]
     
-    # Try to map it to our text display, but fallback to the raw prediction value if it doesn't match
-    result_text = target_display.get(prediction, str(prediction))
+    # Automatically convert continuous decimals (like 1.97) to the nearest category integer (like 2)
+    try:
+        prediction = int(round(float(prediction_raw)))
+    except (ValueError, TypeError):
+        prediction = prediction_raw
 
-    # Render results nicely based on what the model says
-    if prediction == 0 or "low" in str(result_text).lower():
-        st.success(f"Prediction: **{result_text}** 🟢")
-    elif prediction == 1 or "medium" in str(result_text).lower() or "normal" in str(result_text).lower():
-        st.warning(f"Prediction: **{result_text}** 🟡")
+    # Target text mappings for output display
+    target_display = {0: "Low Traffic", 1: "Medium Traffic", 2: "High Traffic"}
+    result_text = target_display.get(prediction, f"Custom Value ({prediction_raw:.2f})")
+
+    # Render clean results with the right color indicators
+    if prediction == 0:
+        st.success(f"Prediction: **{result_text}** 🟢 (Raw score: {prediction_raw:.2f})")
+    elif prediction == 1:
+        st.warning(f"Prediction: **{result_text}** 🟡 (Raw score: {prediction_raw:.2f})")
+    elif prediction == 2:
+        st.error(f"Prediction: **{result_text}** 🔴 (Raw score: {prediction_raw:.2f})")
     else:
-        st.error(f"Prediction: **{result_text}** 🔴")
+        st.info(f"Prediction: **{result_text}** 🔵")
