@@ -67,50 +67,48 @@ time_slot = st.text_input("Time Window String (e.g. 12:00:00 AM)", "12:00:00 AM"
 # 3. LIVE PREDICTION PIPELINE
 # ==========================================
 if st.button("Generate Traffic Prediction"):
+    # Calculate features
     total = car + bike + bus + truck
     heavy_vehicle_ratio = (bus + truck) / (total + 1e-5)
 
-    # 1. Start with an empty DataFrame containing ONLY the expected columns from your training
+    # Initialize dataframe with 0s matching training features
     expected_columns = scaler.feature_names_in_
     input_ready = pd.DataFrame(0.0, index=[0], columns=expected_columns)
 
-    # 2. Set the numerical features directly
+    # Set numerical values
     input_ready["CarCount"] = float(car)
     input_ready["BikeCount"] = float(bike)
     input_ready["BusCount"] = float(bus)
     input_ready["TruckCount"] = float(truck)
     input_ready["Heavy_Vehicle_Ratio"] = float(heavy_vehicle_ratio)
 
-    # 3. Dynamically set the dummy columns to 1 if they match your expected training features
+    # Set categorical dummy flags
     date_col = f"Date_{date}"
     day_col = f"Day of the week_{day}"
     time_col = f"Time_{time_slot}"
 
     if date_col in input_ready.columns:
         input_ready[date_col] = 1.0
+        
     if day_col in input_ready.columns:
         input_ready[day_col] = 1.0
+        
     if time_col in input_ready.columns:
         input_ready[time_col] = 1.0
     else:
-        # Visual alert to help you debug your exact training time format
-        st.sidebar.warning(f"Note: '{time_slot}' format wasn't recognized by the model training columns.")
+        st.sidebar.warning(f"Note: '{time_slot}' format wasn't in training columns.")
 
-    # Scale the aligned structure
+    # Scale and predict
     input_scaled = scaler.transform(input_ready)
-
-    # Run inference execution
     prediction = model.predict(input_scaled)[0]
     
-    # Map to display string
+    # Map output display string
     result_text = target_display.get(prediction, str(prediction))
 
-    # Render results
+    # Render results UI elements
     if prediction == 0 or "low" in str(result_text).lower():
         st.success(f"Prediction: **{result_text}** 🟢")
     elif prediction == 1 or "medium" in str(result_text).lower() or "normal" in str(result_text).lower():
         st.warning(f"Prediction: **{result_text}** 🟡")
     else:
         st.error(f"Prediction: **{result_text}** 🔴 (Raw score: {prediction})")
-    else:
-        st.info(f"Prediction: **{result_text}** 🔵")
