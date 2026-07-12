@@ -104,7 +104,7 @@ if st.button("Generate Traffic Prediction"):
 
     # Scale and predict
     input_scaled = scaler.transform(input_ready)
-    prediction = model.predict(input_scaled)[0]]
+    prediction = model.predict(input_scaled)[0]
     
     # Map output display string
     result_text = target_display.get(prediction, str(prediction))
