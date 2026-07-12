@@ -96,13 +96,16 @@ if st.button("Generate Traffic Prediction"):
     input_scaled = scaler.transform(input_ready.astype(float))
 
     # Run inference execution on the dynamically selected model
+    # Run inference execution on the dynamically selected model
     prediction = model.predict(input_scaled)[0]
-    result_text = target_display.get(prediction, "Unknown")
+    
+    # Try to map it to our text display, but fallback to the raw prediction value if it doesn't match
+    result_text = target_display.get(prediction, str(prediction))
 
-    # Render results with color-coded alert boxes matching severity
-    if prediction == 0:
+    # Render results nicely based on what the model says
+    if prediction == 0 or "low" in str(result_text).lower():
         st.success(f"Prediction: **{result_text}** 🟢")
-    elif prediction == 1:
+    elif prediction == 1 or "medium" in str(result_text).lower() or "normal" in str(result_text).lower():
         st.warning(f"Prediction: **{result_text}** 🟡")
     else:
         st.error(f"Prediction: **{result_text}** 🔴")
