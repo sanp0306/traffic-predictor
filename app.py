@@ -104,15 +104,16 @@ if st.button("Generate Traffic Prediction"):
 
     # Scale and predict
     input_scaled = scaler.transform(input_ready)
-    prediction = model.predict(input_scaled)[0]
+   # Run inference execution
+    prediction = float(model.predict(input_scaled)[0])
     
-    # Map output display string
-    result_text = target_display.get(prediction, str(prediction))
-
-    # Render results UI elements
-    if prediction == 0 or "low" in str(result_text).lower():
-        st.success(f"Prediction: **{result_text}** 🟢")
-    elif prediction == 1 or "medium" in str(result_text).lower() or "normal" in str(result_text).lower():
-        st.warning(f"Prediction: **{result_text}** 🟡")
+    # Define continuous thresholds for your regression score
+    if prediction < 0.8:
+        result_text = "Low Traffic"
+        st.success(f"Prediction: **{result_text}** 🟢 (Raw score: {prediction:.2f})")
+    elif prediction < 1.6:
+        result_text = "Medium Traffic"
+        st.warning(f"Prediction: **{result_text}** 🟡 (Raw score: {prediction:.2f})")
     else:
-        st.error(f"Prediction: **{result_text}** 🔴 (Raw score: {prediction})")
+        result_text = "High Traffic"
+        st.error(f"Prediction: **{result_text}** 🔴 (Raw score: {prediction:.2f})")
