@@ -99,8 +99,12 @@ if st.button("Generate Traffic Prediction"):
         st.sidebar.warning(f"Note: '{time_slot}' format wasn't in training columns.")
 
     # Scale and predict
+    # Ensure columns match the exact order expected by the scaler
+    input_ready = input_ready[scaler.feature_names_in_]
+
+    # Scale and predict
     input_scaled = scaler.transform(input_ready)
-    prediction = model.predict(input_scaled)[0]
+    prediction = model.predict(input_scaled)[0]]
     
     # Map output display string
     result_text = target_display.get(prediction, str(prediction))
