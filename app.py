@@ -1,100 +1,111 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
 import joblib
+import numpy as np
+import pandas as pd
+import streamlit as st
 
-# 1. SET UP PAGE CONFIGURATION & TITLE
-st.set_page_config(page_title="Traffic Volume Predictor", page_icon="🚦", layout="centered")
-st.title("🚦 Traffic Volume Prediction App")
-st.write("Input the current traffic parameters below to predict the traffic density using our trained machine learning models.")
+# 1. Load the shared preprocessing scaler
+scaler = joblib.load("scaler.pkl")
 
-# 2. LOAD TRAINED MODELS AND SCALER
-@st.cache_resource
-def load_assets():
-    models = {
-        "Logistic Regression": joblib.load("logistic_modell.pkl"),
-        "Random Forest": joblib.load("random_forest_model.pkl"),
-        "Gradient Boosting": joblib.load("decision_tree_model.pkl")
-    }
-    scaler = joblib.load("scaler.pkl")
-    return models, scaler
+# Target text mappings for output display
+target_display = {0: "Low Traffic", 1: "Medium Traffic", 2: "High Traffic"}
 
-try:
-    models, scaler = load_assets()
-except Exception as e:
-    st.error(f"Error loading model files: {e}")
-    st.stop()
-
-# 3. SIDEBAR - MODEL SELECTION
-st.sidebar.header("Model Settings")
-selected_model_name = st.sidebar.selectbox(
-    "Choose ML Model", 
-    list(models.keys())
+# ==========================================
+# 2. STREAMLIT USER INTERFACE SETUP
+# ==========================================
+st.title("🚦 Multi-Model Traffic Situation Predictor")
+st.write(
+    "Test live traffic predictions across your three different trained classifiers."
 )
-model = models[selected_model_name]
 
-# 4. USER INPUT INTERFACE (FORM)
-st.subheader("Traffic Parameters")
+# Sidebar layout for choosing the ML model
+st.sidebar.header("Model Configuration")
+selected_model_name = st.sidebar.selectbox(
+    "Choose Active Classifier",
+    ["Random Forest", "Logistic Regression", "Decision Tree"],
+)
+
+# Dynamically load the .pkl file based on the sidebar dropdown selection
+model_files = {
+    "Random Forest": "random_forest_model.pkl",
+    "Logistic Regression": "logistic_model.pkl",
+    "Decision Tree": "decision_tree_model.pkl",
+}
+model = joblib.load(model_files[selected_model_name])
+st.sidebar.success(f"Running Inference via: **{selected_model_name}**")
+
+# Interactive input fields for vehicle metrics split into columns
+st.header("Current Vehicle Metrics")
 col1, col2 = st.columns(2)
-
 with col1:
-    car_count = st.number_input("Car Count", min_value=0, max_value=500, value=25, step=1)
-    bike_count = st.number_input("Bike Count", min_value=0, max_value=500, value=5, step=1)
-    bus_count = st.number_input("Bus Count", min_value=0, max_value=200, value=2, step=1)
-
+    car = col1.number_input("Car Count", min_value=0, value=25)
+    bike = col1.number_input("Bike Count", min_value=0, value=5)
 with col2:
-    truck_count = st.number_input("Truck Count", min_value=0, max_value=200, value=10, step=1)
-    total_volume = car_count + bike_count + bus_count + truck_count
-    st.metric(label="Calculated Total Volume", value=total_volume)
+    bus = col2.number_input("Bus Count", min_value=0, value=2)
+    truck = col2.number_input("Truck Count", min_value=0, value=10)
 
-st.markdown("### Temporal Parameters")
-day_of_month = st.selectbox("Day of the Month", list(range(1, 32)), index=9)
-day_of_week = st.selectbox("Day of the Week", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
-time_window = st.text_input("Time Window String (e.g. 12:00:00 AM)", value="12:00:00 AM")
+# Input fields for date, day, and time windows
+st.header("Temporal Parameters")
+date = st.selectbox("Day of the Month", list(range(1, 32)), index=9)  # Defaults to 10
+day = st.selectbox(
+    "Day of the Week",
+    [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ],
+)
+time_slot = st.text_input("Time Window String (e.g. 12:00:00 AM)", "12:00:00 AM")
 
-# 5. DATA PREPROCESSING AND FEATURE MAPPING
-# Map categorical values to numeric codes matching your training data setup
-day_mapping = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4, "Saturday": 5, "Sunday": 6}
-day_code = day_mapping[day_of_week]
+# ==========================================
+# 3. LIVE PREDICTION PIPELINE
+# ==========================================
+if st.button("Generate Traffic Prediction"):
+    # Apply your engineered feature calculation on the raw user inputs
+    total = car + bike + bus + truck
+    heavy_vehicle_ratio = (bus + truck) / (total + 1e-5)
 
-# Simple mock string length hashing/encoding fallback for Time Window if your training utilized label encoding
-# (Adjust this specific feature transformation if your pipeline treated time window differently!)
-time_encoded = len(time_window) 
+    # Reconstruct the single row DataFrame matching original data structure
+    input_data = pd.DataFrame(
+        [
+            {
+                "Date": date,
+                "Day of the week": day,
+                "Time": time_slot,
+                "CarCount": car,
+                "BikeCount": bike,
+                "BusCount": bus,
+                "TruckCount": truck,
+                "Heavy_Vehicle_Ratio": heavy_vehicle_ratio,
+            }
+        ]
+    )
 
-# Assemble into the precise feature shape expected by your Scikit-Learn Scaler
-# Make sure the ordering matches your original X DataFrame layout:
-features = np.array([[car_count, bike_count, bus_count, truck_count, total_volume, day_of_month, day_code, time_encoded]])
+    # Run get_dummies on the categoricals
+    cat_cols = ["Date", "Day of the week", "Time"]
+    input_encoded = pd.get_dummies(input_data, columns=cat_cols)
 
-# 6. LIVE PREDICTION PIPELINE
-if st.button("Generate Traffic Prediction", type="primary"):
-    with st.spinner("Calculating predictions..."):
-        try:
-            # Apply standard scaler transformation
-            input_scaled = scaler.transform(features)
-            
-            # Run inference execution on the dynamically selected model
-            prediction_raw = model.predict(input_scaled)[0]
-            
-            # Automatically convert continuous decimals (like 1.97) to nearest category integer
-            try:
-                prediction = int(round(float(prediction_raw)))
-            except (ValueError, TypeError):
-                prediction = prediction_raw
+    # Use the scaler metadata to perfectly align dummy variables matching your training columns
+    expected_columns = scaler.feature_names_in_
+    input_ready = input_encoded.reindex(columns=expected_columns, fill_value=0)
 
-            # Target text mappings for output display
-            target_display = {0: "Low Traffic", 1: "Medium Traffic", 2: "High Traffic"}
-            result_text = target_display.get(prediction, f"Custom Value ({prediction_raw:.2f})")
+    # Scale the aligned array structure
+    input_scaled = scaler.transform(input_ready.astype(float))
 
-            # Render clean results with color indicators
-            st.markdown("---")
-            if prediction == 0:
-                st.success(f"Prediction: **{result_text}** 🟢 (Raw score: {prediction_raw:.2f})")
-            elif prediction == 1:
-                st.warning(f"Prediction: **{result_text}** 🟡 (Raw score: {prediction_raw:.2f})")
-            elif prediction == 2:
-                st.error(f"Prediction: **{result_text}** 🔴 (Raw score: {prediction_raw:.2f})")
-            else:
-                st.info(f"Prediction: **{result_text}** 🔵")
-                
-        except Exception as error:
-            st.error(f"An error occurred during pipeline execution: {error}")
+    # Run inference execution on the dynamically selected model
+    # Run inference execution on the dynamically selected model
+    prediction = model.predict(input_scaled)[0]
+    
+    # Try to map it to our text display, but fallback to the raw prediction value if it doesn't match
+    result_text = target_display.get(prediction, str(prediction))
+
+    # Render results nicely based on what the model says
+    if prediction == 0 or "low" in str(result_text).lower():
+        st.success(f"Prediction: **{result_text}** 🟢")
+    elif prediction == 1 or "medium" in str(result_text).lower() or "normal" in str(result_text).lower():
+        st.warning(f"Prediction: **{result_text}** 🟡")
+    else:
+        st.error(f"Prediction: **{result_text}** 🔴")
