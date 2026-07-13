@@ -12,7 +12,7 @@ st.write("Input the current traffic parameters below to predict the traffic dens
 @st.cache_resource
 def load_assets():
     models = {
-        "Logistic Regression": joblib.load("logistic_model.pkl"),
+        "Logistic Regression": joblib.load("logistic_modell.pkl"),
         "Random Forest": joblib.load("random_forest_model.pkl"),
         "Gradient Boosting": joblib.load("gradient_boosting_model.pkl")
     }
