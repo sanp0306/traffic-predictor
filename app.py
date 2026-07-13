@@ -31,7 +31,7 @@ selected_model_name = st.sidebar.selectbox(
 # Dynamically load the .pkl file based on the sidebar dropdown selection
 model_files = {
     "Random Forest": "random_forest_model.pkl",
-    "Logistic Regression": "logistic_model.pkl",
+    "Logistic Regression": "logistic_modell.pkl",
     "Decision Tree": "decision_tree_model.pkl",
 }
 model = joblib.load(model_files[selected_model_name])
