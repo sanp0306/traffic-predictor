@@ -6,8 +6,12 @@ import streamlit as st
 # 1. Load the shared preprocessing scaler
 scaler = joblib.load("scaler.pkl")
 
-# Target text mappings for output display
-target_display = {0: "Low Traffic", 1: "Medium Traffic", 2: "High Traffic"}
+# Target text mappings for output display (expanded to support multiple formats)
+target_display = {
+    0: "Low Traffic", "0": "Low Traffic", "0.0": "Low Traffic", "low": "Low Traffic",
+    1: "Medium Traffic", "1": "Medium Traffic", "1.0": "Medium Traffic", "medium": "Medium Traffic", "normal": "Medium Traffic",
+    2: "High Traffic", "2": "High Traffic", "2.0": "High Traffic", "high": "High Traffic"
+}
 
 # ==========================================
 # 2. STREAMLIT USER INTERFACE SETUP
@@ -84,8 +88,12 @@ if st.button("Generate Traffic Prediction"):
         ]
     )
 
-    # Run get_dummies on the categoricals
+    # Convert categorical columns explicitly to strings before dummy encoding
+    # This ensures pd.get_dummies doesn't ignore numerical 'Date' types if training treated them as objects
     cat_cols = ["Date", "Day of the week", "Time"]
+    for col in cat_cols:
+        input_data[col] = input_data[col].astype(str)
+        
     input_encoded = pd.get_dummies(input_data, columns=cat_cols)
 
     # Use the scaler metadata to perfectly align dummy variables matching your training columns
@@ -96,16 +104,22 @@ if st.button("Generate Traffic Prediction"):
     input_scaled = scaler.transform(input_ready.astype(float))
 
     # Run inference execution on the dynamically selected model
-    # Run inference execution on the dynamically selected model
     prediction = model.predict(input_scaled)[0]
     
-    # Try to map it to our text display, but fallback to the raw prediction value if it doesn't match
-    result_text = target_display.get(prediction, str(prediction))
+    # Robust Lookup: Check if prediction is an integer, float, or string representation
+    clean_pred_key = str(prediction).strip().lower()
+    
+    if prediction in target_display:
+        result_text = target_display[prediction]
+    elif clean_pred_key in target_display:
+        result_text = target_display[clean_pred_key]
+    else:
+        result_text = f"Unknown Class ({prediction})"
 
     # Render results nicely based on what the model says
-    if prediction == 0 or "low" in str(result_text).lower():
+    if "low" in result_text.lower():
         st.success(f"Prediction: **{result_text}** 🟢")
-    elif prediction == 1 or "medium" in str(result_text).lower() or "normal" in str(result_text).lower():
+    elif "medium" in result_text.lower() or "normal" in result_text.lower():
         st.warning(f"Prediction: **{result_text}** 🟡")
     else:
         st.error(f"Prediction: **{result_text}** 🔴")
